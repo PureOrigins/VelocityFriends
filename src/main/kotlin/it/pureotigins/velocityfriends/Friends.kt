@@ -2,12 +2,15 @@ package it.pureotigins.velocityfriends
 
 import com.mojang.brigadier.arguments.StringArgumentType.getString
 import com.mojang.brigadier.arguments.StringArgumentType.word
+import com.mojang.brigadier.context.CommandContext
+import com.velocitypowered.api.command.CommandSource
 import com.velocitypowered.api.event.EventTask.async
 import com.velocitypowered.api.event.ResultedEvent
 import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.player.ServerConnectedEvent
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
+import it.pureorigins.velocityconfiguration.sendMessage
 import it.pureorigins.velocityconfiguration.templateComponent
 import kotlinx.serialization.Serializable
 import net.kyori.adventure.text.Component
@@ -15,7 +18,6 @@ import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.Logger
 import java.io.IOException
-import java.time.Duration
 import java.util.*
 
 class Friends(
@@ -53,14 +55,14 @@ class Friends(
     
     fun add(player: Player, friendUniqueId: UUID, friendName: String) {
         if (player.uniqueId == friendUniqueId) {
-            return player.sendMessage(config.cannotUseOnSelf.templateComponent())
+            return player.sendMessage(config.add.cannotUseOnSelf?.templateComponent())
         }
         transaction(database) {
             if (FriendsTable.has(player.uniqueId, friendUniqueId)) {
-                return@transaction player.sendMessage(config.alreadyFriend.templateComponent("player" to friendName))
+                return@transaction player.sendMessage(config.add.alreadyFriend?.templateComponent("player" to friendName))
             }
             if (FriendRequestsTable.has(player.uniqueId, friendUniqueId)) {
-                return@transaction player.sendMessage(config.alreadyRequested.templateComponent("player" to friendName))
+                return@transaction player.sendMessage(config.add.alreadyRequested?.templateComponent("player" to friendName))
             }
             if (FriendRequestsTable.has(friendUniqueId, player.uniqueId)) {
                 server.eventManager.fire(NewFriendEvent(player, friendUniqueId, friendName)).thenAccept {
@@ -68,8 +70,8 @@ class Friends(
                     if (result.isAllowed) {
                         FriendRequestsTable.remove(friendUniqueId, player.uniqueId)
                         FriendsTable.add(friendUniqueId, player.uniqueId)
-                        player.sendMessage(config.friendAdded.templateComponent("player" to friendName))
-                        friendUniqueId.sendMessage(config.friendAccepted.templateComponent("player" to player.username))
+                        player.sendMessage(config.add.friendAdded?.templateComponent("player" to friendName))
+                        friendUniqueId.sendMessage(config.add.friendAccepted?.templateComponent("player" to player.username))
                     } else {
                         player.sendMessage(result.cancelMessage!!)
                     }
@@ -79,9 +81,9 @@ class Friends(
                     val result = it.result
                     if (result.isAllowed) {
                         FriendRequestsTable.add(player.uniqueId, friendUniqueId)
-                        player.sendMessage(config.requestSent.templateComponent("player" to friendName))
+                        player.sendMessage(config.add.requestSent?.templateComponent("player" to friendName))
                         server.getPlayer(friendUniqueId).ifPresent {
-                            it.sendMessage(config.request.templateComponent("player" to player.username))
+                            it.sendMessage(config.add.request?.templateComponent("player" to player.username))
                         }
                     } else {
                         player.sendMessage(result.cancelMessage!!)
@@ -93,7 +95,7 @@ class Friends(
     
     fun remove(player: Player, friendUniqueId: UUID, friendName: String) {
         if (player.uniqueId == friendUniqueId) {
-            return player.sendMessage(config.cannotUseOnSelf.templateComponent())
+            return player.sendMessage(config.remove.cannotUseOnSelf?.templateComponent())
         }
         transaction(database) {
             when {
@@ -102,10 +104,8 @@ class Friends(
                         val result = it.result
                         if (result.isAllowed) {
                             FriendsTable.remove(player.uniqueId, friendUniqueId)
-                            player.sendMessage(config.friendRemoved.templateComponent("player" to friendName))
-                            if (config.playerFriendRemoved != null) {
-                                friendUniqueId.sendMessage(config.playerFriendRemoved.templateComponent("player" to player.username))
-                            }
+                            player.sendMessage(config.remove.friendRemoved?.templateComponent("player" to friendName))
+                            friendUniqueId.sendMessage(config.remove.playerFriendRemoved?.templateComponent("player" to player.username))
                         } else {
                             player.sendMessage(result.cancelMessage!!)
                         }
@@ -116,11 +116,9 @@ class Friends(
                         val result = it.result
                         if (result.isAllowed) {
                             FriendRequestsTable.remove(player.uniqueId, friendUniqueId)
-                            player.sendMessage(config.requestCanceled.templateComponent("player" to friendName))
-                            if (config.playerRequestCanceled != null) {
-                                server.getPlayer(friendUniqueId).ifPresent {
-                                    it.sendMessage(config.playerRequestCanceled.templateComponent("player" to player.username))
-                                }
+                            player.sendMessage(config.remove.requestCanceled?.templateComponent("player" to friendName))
+                            server.getPlayer(friendUniqueId).ifPresent {
+                                it.sendMessage(config.remove.playerRequestCanceled?.templateComponent("player" to player.username))
                             }
                         } else {
                             player.sendMessage(result.cancelMessage!!)
@@ -132,27 +130,25 @@ class Friends(
                         val result = it.result
                         if (result.isAllowed) {
                             FriendRequestsTable.remove(friendUniqueId, player.uniqueId)
-                            player.sendMessage(config.requestDeclined.templateComponent("player" to friendName))
-                            if (config.playerRequestDeclined != null) {
-                                friendUniqueId.sendMessage(config.playerRequestDeclined.templateComponent("player" to player.username))
-                            }
+                            player.sendMessage(config.remove.requestDeclined?.templateComponent("player" to friendName))
+                            friendUniqueId.sendMessage(config.remove.playerRequestDeclined?.templateComponent("player" to player.username))
                         } else {
                             player.sendMessage(result.cancelMessage!!)
                         }
                     }
                 }
-                else -> player.sendMessage(config.notFriend.templateComponent("player" to friendName))
+                else -> player.sendMessage(config.remove.notFriend?.templateComponent("player" to friendName))
             }
         }
     }
     
     fun block(player: Player, blockedUniqueId: UUID, blockedName: String) {
         if (player.uniqueId == blockedUniqueId) {
-            return player.sendMessage(config.cannotUseOnSelf.templateComponent())
+            return player.sendMessage(config.block.cannotUseOnSelf?.templateComponent())
         }
         transaction(database) {
             if (BlockedPlayersTable.has(player.uniqueId, blockedUniqueId)) {
-                return@transaction player.sendMessage(config.alreadyBlocked.templateComponent("player" to blockedName))
+                return@transaction player.sendMessage(config.block.alreadyBlocked?.templateComponent("player" to blockedName))
             }
             server.eventManager.fire(PlayerBlocksPlayerEvent(player, blockedUniqueId, blockedName)).thenAccept {
                 val result = it.result
@@ -160,7 +156,7 @@ class Friends(
                     FriendsTable.remove(player.uniqueId, blockedUniqueId)
                     FriendRequestsTable.remove(player.uniqueId, blockedUniqueId)
                     FriendRequestsTable.remove(blockedUniqueId, player.uniqueId)
-                    player.sendMessage(config.playerBlocked.templateComponent("player" to blockedName))
+                    player.sendMessage(config.block.playerBlocked?.templateComponent("player" to blockedName))
                 } else {
                     player.sendMessage(result.cancelMessage!!)
                 }
@@ -170,17 +166,17 @@ class Friends(
     
     fun unblock(player: Player, blockedUniqueId: UUID, blockedName: String) {
         if (player.uniqueId == blockedUniqueId) {
-            return player.sendMessage(config.cannotUseOnSelf.templateComponent())
+            return player.sendMessage(config.unblock.cannotUseOnSelf?.templateComponent())
         }
         transaction(database) {
             if (!BlockedPlayersTable.has(player.uniqueId, blockedUniqueId)) {
-                return@transaction player.sendMessage(config.playerNotBlocked.templateComponent("player" to blockedName))
+                return@transaction player.sendMessage(config.unblock.notBlocked?.templateComponent("player" to blockedName))
             }
             server.eventManager.fire(PlayerUnblocksPlayerEvent(player, blockedUniqueId, blockedName)).thenAccept {
                 val result = it.result
                 if (result.isAllowed) {
                     BlockedPlayersTable.remove(player.uniqueId, blockedUniqueId)
-                    player.sendMessage(config.playerUnblocked.templateComponent("player" to blockedName))
+                    player.sendMessage(config.unblock.playerUnblocked?.templateComponent("player" to blockedName))
                 } else {
                     player.sendMessage(result.cancelMessage!!)
                 }
@@ -188,13 +184,13 @@ class Friends(
         }
     }
     
-    private fun UUID.sendMessage(component: Component) {
+    private fun UUID.sendMessage(component: Component?) {
+        if (component == null) return
         val player = server.getPlayer(this).orElse(null)
         if (player != null) {
             player.sendMessage(component)
         } else {
-            val expirationTime = if (config.newsExpirationTimeDays != null) Duration.ofDays(config.newsExpirationTimeDays) else null
-            NewsTable.add(this, component, expirationTime)
+            NewsTable.add(this, component, null)
         }
     }
     
@@ -203,7 +199,7 @@ class Friends(
             it is Player && it.hasPermission("friends.friend")
         }
         success {
-            it.source.sendMessage(config.commandUsage.templateComponent())
+            it.source.sendMessage(config.commandUsage?.templateComponent())
         }
         then(addCommand)
         then(removeCommand)
@@ -212,12 +208,12 @@ class Friends(
         then(infoCommand)
     }
     
-    private val addCommand get() = literal(config.addCommandName) {
+    private val addCommand get() = literal(config.add.commandName) {
         requires {
             it is Player && it.hasPermission("friends.friend.add")
         }
         success {
-            it.source.sendMessage(config.addCommandUsage.templateComponent())
+            it.source.sendMessage(config.add.commandUsage?.templateComponent())
         }
         then(argument("player", word()) {
             suggests { context ->
@@ -241,22 +237,18 @@ class Friends(
             success { context ->
                 val sender = context.source as Player
                 val playerName = getString(context, "player")
-                val player = try {
-                    getOfflinePlayer(playerName) ?: return@success sender.sendMessage(config.playerNotFound.templateComponent("player" to playerName))
-                } catch (e: IOException) {
-                    return@success sender.sendMessage(config.mojangServerError.templateComponent("error" to e.message, "command" to context.input))
-                }
+                val player = context.getOfflinePlayer(playerName) ?: return@success
                 add(sender, player.uuid, player.name)
             }
         })
     }
     
-    private val removeCommand get() = literal(config.removeCommandName) {
+    private val removeCommand get() = literal(config.remove.commandName) {
         requires {
             it is Player && it.hasPermission("friends.friend.remove")
         }
         success {
-            it.source.sendMessage(config.removeCommandUsage.templateComponent())
+            it.source.sendMessage(config.remove.commandUsage?.templateComponent())
         }
         then(argument("player", word()) {
             suggests { context ->
@@ -274,22 +266,18 @@ class Friends(
             success { context ->
                 val sender = context.source as Player
                 val playerName = getString(context, "player")
-                val player = try {
-                    getOfflinePlayer(playerName) ?: return@success sender.sendMessage(config.playerNotFound.templateComponent("player" to playerName))
-                } catch (e: IOException) {
-                    return@success sender.sendMessage(config.mojangServerError.templateComponent("error" to e.message, "command" to context.input))
-                }
+                val player = context.getOfflinePlayer(playerName) ?: return@success
                 remove(sender, player.uuid, player.name)
             }
         })
     }
     
-    private val blockCommand get() = literal(config.blockCommandName) {
+    private val blockCommand get() = literal(config.block.commandName) {
         requires {
             it is Player && it.hasPermission("friends.friend.block")
         }
         success {
-            it.source.sendMessage(config.blockCommandUsage.templateComponent())
+            it.source.sendMessage(config.block.commandUsage?.templateComponent())
         }
         then(argument("player", word()) {
             suggests { context ->
@@ -304,22 +292,18 @@ class Friends(
             success { context ->
                 val sender = context.source as Player
                 val playerName = getString(context, "player")
-                val player = try {
-                    getOfflinePlayer(playerName) ?: return@success sender.sendMessage(config.playerNotFound.templateComponent("player" to playerName))
-                } catch (e: IOException) {
-                    return@success sender.sendMessage(config.mojangServerError.templateComponent("error" to e.message, "command" to context.input))
-                }
+                val player = context.getOfflinePlayer(playerName) ?: return@success
                 block(sender, player.uuid, player.name)
             }
         })
     }
     
-    private val unblockCommand get() = literal(config.unblockCommandName) {
+    private val unblockCommand get() = literal(config.unblock.commandName) {
         requires {
             it is Player && it.hasPermission("friends.friend.unblock")
         }
         success {
-            it.source.sendMessage(config.unblockCommandUsage.templateComponent())
+            it.source.sendMessage(config.unblock.commandUsage?.templateComponent())
         }
         then(argument("player", word()) {
             suggests { context ->
@@ -334,11 +318,7 @@ class Friends(
             success { context ->
                 val sender = context.source as Player
                 val playerName = getString(context, "player")
-                val player = try {
-                    getOfflinePlayer(playerName) ?: return@success sender.sendMessage(config.playerNotFound.templateComponent("player" to playerName))
-                } catch (e: IOException) {
-                    return@success sender.sendMessage(config.mojangServerError.templateComponent("error" to e.message, "command" to context.input))
-                }
+                val player = context.getOfflinePlayer(playerName) ?: return@success
                 unblock(sender, player.uuid, player.name)
             }
         })
@@ -356,18 +336,25 @@ class Friends(
                     val requestsOut = FriendRequestsTable.get(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it) }
                     val requestsIn = FriendRequestsTable.inverseGet(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it) }
                     val blocked = BlockedPlayersTable.get(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it) }
-                    sender.sendMessage(config.info.templateComponent("friends" to friends, "requestsOut" to requestsOut, "requestsIn" to requestsIn, "blocked" to blocked))
+                    sender.sendMessage(config.info.info?.templateComponent("friends" to friends, "requestsOut" to requestsOut, "requestsIn" to requestsIn, "blocked" to blocked))
                 }
             } catch (e: IOException) {
-                sender.sendMessage(config.mojangServerError.templateComponent("error" to e.message, "command" to context.input))
+                sender.sendMessage(config.mojangServerError?.templateComponent("error" to e.message, "command" to context.input))
             }
         }
     }
     
-    private fun getOfflinePlayer(username: String): PlayerInfo? {
+    private fun CommandContext<CommandSource>.getOfflinePlayer(username: String): PlayerInfo? {
         val onlinePlayer = server.getPlayer(username).orElse(null)
         if (onlinePlayer != null) return PlayerInfo(onlinePlayer.username, onlinePlayer.uniqueId)
-        return MojangApi.getPlayerInfo(username)
+        return try {
+            MojangApi.getPlayerInfo(username).also {
+                if (it == null) source.sendMessage(config.unblock.playerNotFound?.templateComponent("player" to username))
+            }
+        } catch (e: IOException) {
+            source.sendMessage(config.mojangServerError?.templateComponent("error" to e.message, "command" to input))
+            null
+        }
     }
     
     @Subscribe
@@ -385,47 +372,77 @@ class Friends(
            }
         }
         if (playerRequests.isNotEmpty()) {
-            player.sendMessage(config.multipleRequests.templateComponent("players" to playerRequests))
+            player.sendMessage(config.joinRequests?.templateComponent("players" to playerRequests))
         }
     }
     
     @Serializable
     data class Config(
-        val newsExpirationTimeDays: Long? = null,
-        val friendAdded: String = "Now you and \${player} are friends.",
-        val friendAccepted: String = "You accepted \${player} request.",
-        val requestSent: String = "Friend request sent to \${player}.",
-        val request: String = "\${player} wants to be your friend.",
-        val multipleRequests: String = "You have \${players?size} new friend requests.",
-        val requestCanceled: String = "Friend request canceled.",
-        val playerRequestCanceled: String? = null,
-        val requestDeclined: String = "Request denied.",
-        val playerRequestDeclined: String? = null,
-        val friendRemoved: String = "Friend removed.",
-        val playerFriendRemoved: String? = null,
-        val alreadyFriend: String = "\${player} is already your friend.",
-        val alreadyRequested: String = "You have already sent a request to \${player}.",
-        val notFriend: String = "\${player} is not your friend.",
-        val playerNotFound: String = "Player not found.",
-        val cannotUseOnSelf: String = "You cannot use this command on yourself!",
-        val mojangServerError: String = "An error occurred while contacting Mojang servers, try later.",
-        val playerBlocked: String = "You blocked \${player}",
-        val playerUnblocked: String = "\${player} is no more blocked.",
-        val alreadyBlocked: String = "\${player} is already blocked.",
-        val playerNotBlocked: String = "\${player} is not blocked.",
-        val info: String = "Friends: <#list friends as friend>\${friend}<#sep>, </#list>\nBlocked players: <#list blocked as player>\${player}<#sep>, </#info>",
+        val joinRequests: String? = "[<#list players[0..*5] as player>{\"text\": \"\${player}\", \"color\": \"aqua\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[+]\", \"color\": \"green\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends add \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"add\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends remove \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"remove\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[×]\", \"color\": \"dark_red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends block \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"block\"}}<#sep>, {\"text\":\", \", \"color\":\"dark_aqua\"}, </#list>, {\"text\": \" <#if (players?size > 5)>and other \${players?size - 5}</#if> <#if players?size == 1>wants<#else>want</#if> to be your friend.\", \"color\": \"dark_aqua\"}]",
+        val mojangServerError: String? = "[{\"text\": \"An error occurred while contacting Mojang servers. \", \"color\": \"dark_gray\"}, {\"text\": \"[RETRY]\", \"color\": \"gray\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/\${command}\"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"retry\"}}]",
         val commandName: String = "friends",
-        val commandUsage: String = "Usage: /friends <add | accept | remove>",
-        val addCommandName: String = "add",
-        val addCommandUsage: String = "/friends add <player>",
-        val removeCommandName: String = "remove",
-        val removeCommandUsage: String = "/friends remove <player>",
-        val blockCommandName: String = "block",
-        val blockCommandUsage: String = "/block <player>",
-        val unblockCommandName: String = "unblock",
-        val unblockCommandUsage: String = "/unblock <player>",
-        val infoCommandsName: String = "info"
-    )
+        val commandUsage: String? = "[{\"text\": \"Usage: \", \"color\": \"dark_gray\"}, {\"text\": \"/friends <add | remove | block | unblock | info>\", \"color\": \"gray\"}]",
+        val add: Add = Add(),
+        val remove: Remove = Remove(),
+        val block: Block = Block(),
+        val unblock: Unblock = Unblock(),
+        val info: Info = Info()
+    ) {
+        @Serializable
+        data class Add(
+            val commandName: String = "add",
+            val commandUsage: String? = "[{\"text\": \"Usage: \", \"color\": \"dark_gray\"}, {\"text\": \"/friends add <player>\", \"color\": \"gray\"}]",
+            val cannotUseOnSelf: String? = "{\"text\": \"Cannot use this command on yourself.\", \"color\": \"dark_gray\"}",
+            val playerNotFound: String? = "{\"text\": \"Player not found.\", \"color\": \"dark_gray\"}",
+            val alreadyFriend: String? = "[{\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" is already your friend.\", \"color\": \"dark_gray\"}]",
+            val alreadyRequested: String? = "[{\"text\": \"You have already sent a friend request to \", \"color\": \"dark_gray\"}, {\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \".\", \"color\": \"dark_gray\"}]",
+            val friendAdded: String? = "[{\"text\": \"You have accepted the friend request of \", \"color\": \"gray\"}, {\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \". \", \"color\": \"gray\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends remove \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"undo\"}}]",
+            val friendAccepted: String? = "[{\"text\": \"\${player}\", \"color\": \"aqua\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" accepted your friend request.\", \"color\": \"dark_aqua\"}]",
+            val requestSent: String? = "[{\"text\": \"Friend request sent to \", \"color\": \"gray\"}, {\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \". \", \"color\": \"gray\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends remove \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"undo\"}}]",
+            val request: String? = "[{\"text\": \"\${player}\", \"color\": \"aqua\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" wants to be your friend. \", \"color\": \"dark_aqua\"}, {\"text\":\"[+]\", \"color\": \"green\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends add \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"add\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends remove \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"remove\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[×]\", \"color\": \"dark_red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends block \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"block\"}}]",
+        )
+        
+        @Serializable
+        data class Remove(
+            val commandName: String = "remove",
+            val commandUsage: String? = "[{\"text\": \"Usage: \", \"color\": \"dark_gray\"}, {\"text\": \"/friends remove <player>\", \"color\": \"gray\"}]",
+            val cannotUseOnSelf: String? = "{\"text\": \"Cannot use this command on yourself.\", \"color\": \"dark_gray\"}",
+            val playerNotFound: String? = "{\"text\": \"Player not found.\", \"color\": \"dark_gray\"}",
+            val notFriend: String? = "[{\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" is not your friend.\", \"color\": \"dark_gray\"}]",
+            val friendRemoved: String? = "[{\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" is no more your friend.\", \"color\": \"gray\"}]",
+            val playerFriendRemoved: String? = null,
+            val requestCanceled: String? = "{\"text\": \"Friend request canceled.\", \"color\": \"gray\"}",
+            val playerRequestCanceled: String? = "[{\"text\": \"\${player}\", \"color\": \"aqua\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" canceled his friend request.\", \"color\": \"dark_aqua\"}]",
+            val requestDeclined: String? = "[{\"text\": \"\${player}\", \"color\": \"aqua\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" friend request declined.\", \"color\": \"gray\"}]",
+            val playerRequestDeclined: String? = "[{\"text\": \"\${player}\", \"color\": \"aqua\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" denied your friend request.\", \"color\": \"dark_aqua\"}]"
+        )
+    
+        @Serializable
+        data class Block(
+            val commandName: String = "block",
+            val commandUsage: String? = "[{\"text\": \"Usage: \", \"color\": \"dark_gray\"}, {\"text\": \"/friends block <player>\", \"color\": \"gray\"}]",
+            val cannotUseOnSelf: String? = "{\"text\": \"Cannot use this command on yourself.\", \"color\": \"dark_gray\"}",
+            val playerNotFound: String? = "{\"text\": \"Player not found.\", \"color\": \"dark_gray\"}",
+            val alreadyBlocked: String? = "[{\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" is already blocked.\", \"color\": \"dark_gray\"}]",
+            val playerBlocked: String? = "[{\"text\": \"You blocked \", \"color\": \"gray\"}, {\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \". \", \"color\": \"gray\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends unblock \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"undo\"}}]"
+        )
+    
+        @Serializable
+        data class Unblock(
+            val commandName: String = "unblock",
+            val commandUsage: String? = "[{\"text\": \"Usage: \", \"color\": \"dark_gray\"}, {\"text\": \"/friends unblock <player>\", \"color\": \"gray\"}]",
+            val cannotUseOnSelf: String? = "{\"text\": \"Cannot use this command on yourself.\", \"color\": \"dark_gray\"}",
+            val playerNotFound: String? = "{\"text\": \"Player not found.\", \"color\": \"dark_gray\"}",
+            val notBlocked: String? = "[{\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" is not blocked.\", \"color\": \"dark_gray\"}]",
+            val playerUnblocked: String? = "[{\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" is no more blocked. \", \"color\": \"gray\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends block \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"undo\"}}]"
+        )
+    
+        @Serializable
+        data class Info(
+            val commandName: String = "info",
+            val info: String? = "[{\"text\": \"\${friends?size} Friend<#if friends?size != 1>s</#if><#if (friends?size > 0)>: </#if>\", \"color\": \"gray\"}<#list friends as friend>, {\"text\": \"\${friend}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${friend} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" \", \"color\": \"gray\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends remove \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"remove\"}}<#sep>, {\"text\": \", \", \"color\": \"gray\"}</#list><#if (requestsIn?size > 0)>, {\"text\":\"\\n\"}, {\"text\": \"\${requestsIn?size} Requests: \", \"color\": \"gray\"}, <#list requestsIn as request>{\"text\": \"\${request}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${request} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" \", \"color\": \"gray\"}, {\"text\":\"[+]\", \"color\": \"green\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends add \${request} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"add\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends remove \${request} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"remove\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[×]\", \"color\": \"dark_red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends block \${request} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"block\"}}<#sep>, {\"text\": \", \", \"color\": \"gray\"},</#list></#if><#if (requestsOut?size > 0)>, {\"text\":\"\\n\"}, {\"text\": \"\${requestsOut?size} Sent requests: \", \"color\": \"gray\"}, <#list requestsOut as request>{\"text\": \"\${request}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${request} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" \", \"color\":\"gray\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends remove \${request} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"undo\"}}<#sep>, {\"text\": \", \", \"color\": \"gray\"},</#list></#if><#if (requestsIn?size > 0)>, {\"text\":\"\\n\"}, {\"text\": \"\${blocked?size} Blocked users: \", \"color\": \"gray\"}, <#list blocked as player>{\"text\": \"\${player}\", \"color\": \"gold\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\", \" \", \"color\": \"gray\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends unblock \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"unblock\"}}<#sep>, {\"text\": \", \", \"color\": \"gray\"},</#list></#if>]"
+        )
+    }
 }
 
 data class NewFriendEvent(
