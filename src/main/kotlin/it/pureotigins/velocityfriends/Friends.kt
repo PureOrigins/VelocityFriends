@@ -345,13 +345,14 @@ class Friends(
             val sender = context.source as Player
             try {
                 transaction(database) {
-                    val friends = FriendsTable.get(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it) }
-                    val requestsOut = FriendRequestsTable.get(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it) }
-                    val requestsIn = FriendRequestsTable.inverseGet(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it) }
-                    val blocked = BlockedPlayersTable.get(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it) }
+                    val friends = FriendsTable.get(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it)?.name }
+                    val requestsOut = FriendRequestsTable.get(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it)?.name }
+                    val requestsIn = FriendRequestsTable.inverseGet(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it)?.name }
+                    val blocked = BlockedPlayersTable.get(sender.uniqueId).mapNotNull { MojangApi.getPlayerInfo(it)?.name }
                     sender.sendMessage(config.info.info?.templateComponent("friends" to friends, "requestsOut" to requestsOut, "requestsIn" to requestsIn, "blocked" to blocked))
                 }
             } catch (e: IOException) {
+                logger.warn("Mojang error", e)
                 sender.sendMessage(config.mojangServerError?.templateComponent("error" to e.message, "command" to context.input))
             }
         }
