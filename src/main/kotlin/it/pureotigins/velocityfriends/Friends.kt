@@ -165,6 +165,7 @@ class Friends(
                     FriendsTable.remove(player.uniqueId, blockedUniqueId)
                     FriendRequestsTable.remove(player.uniqueId, blockedUniqueId)
                     FriendRequestsTable.remove(blockedUniqueId, player.uniqueId)
+                    BlockedPlayersTable.add(player.uniqueId, blockedUniqueId)
                     player.sendMessage(config.block.playerBlocked?.templateComponent("player" to blockedName))
                 } else {
                     player.sendMessage(result.cancelMessage!!)

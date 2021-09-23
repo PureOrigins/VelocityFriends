@@ -87,6 +87,11 @@ object BlockedPlayersTable : Table("blocked_players") {
     
     override val primaryKey = PrimaryKey(playerUniqueId, blockedUniqueId)
     
+    fun add(playerUniqueId: UUID, blockedUniqueId: UUID) = insertIgnore {
+        it[this.playerUniqueId] = playerUniqueId.toString()
+        it[this.blockedUniqueId] = blockedUniqueId.toString()
+    }.insertedCount > 0
+    
     fun has(playerUniqueId: UUID, blockedUniqueId: UUID) =
         select { (BlockedPlayersTable.playerUniqueId eq playerUniqueId.toString()) and (BlockedPlayersTable.blockedUniqueId eq blockedUniqueId.toString()) }.count() > 0
     
