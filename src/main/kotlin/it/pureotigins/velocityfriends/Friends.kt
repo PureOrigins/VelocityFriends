@@ -27,7 +27,7 @@ class Friends(
     private val config: Config
 ) : VelocityCommand {
     fun isBlocked(blockedUniqueId: UUID, blockerUniqueId: UUID): Boolean {
-        return !transaction(database) { BlockedPlayersTable.has(blockerUniqueId, blockedUniqueId) }
+        return transaction(database) { BlockedPlayersTable.has(blockerUniqueId, blockedUniqueId) }
     }
     
     fun isBlocked(blocked: Player, blocker: Player) = isBlocked(blocked.uniqueId, blocker.uniqueId)
