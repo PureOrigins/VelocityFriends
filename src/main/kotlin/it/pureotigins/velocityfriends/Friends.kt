@@ -7,6 +7,7 @@ import com.velocitypowered.api.command.CommandSource
 import com.velocitypowered.api.event.EventTask.async
 import com.velocitypowered.api.event.ResultedEvent
 import com.velocitypowered.api.event.Subscribe
+import com.velocitypowered.api.event.connection.PostLoginEvent
 import com.velocitypowered.api.event.player.ServerConnectedEvent
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
@@ -373,7 +374,7 @@ class Friends(
     }
     
     @Subscribe
-    fun onPlayerJoin(event: ServerConnectedEvent) = async {
+    fun onPlayerJoin(event: PostLoginEvent) = async {
         val player = event.player
         val (news, requests) = transaction(database) {
             NewsTable.get(player.uniqueId) to FriendRequestsTable.inverseGet(player.uniqueId)
