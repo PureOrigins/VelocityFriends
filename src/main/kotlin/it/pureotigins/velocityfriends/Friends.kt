@@ -7,8 +7,8 @@ import com.velocitypowered.api.command.CommandSource
 import com.velocitypowered.api.event.EventTask.async
 import com.velocitypowered.api.event.ResultedEvent
 import com.velocitypowered.api.event.Subscribe
+import com.velocitypowered.api.event.connection.DisconnectEvent
 import com.velocitypowered.api.event.connection.PostLoginEvent
-import com.velocitypowered.api.event.player.ServerConnectedEvent
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import it.pureorigins.velocityconfiguration.sendMessage
@@ -374,7 +374,7 @@ class Friends(
     }
     
     @Subscribe
-    fun onPlayerJoin(event: PostLoginEvent) = async {
+    fun onPlayerLoginSendRequests(event: PostLoginEvent) = async {
         val player = event.player
         val (news, requests) = transaction(database) {
             NewsTable.get(player.uniqueId) to FriendRequestsTable.inverseGet(player.uniqueId)
@@ -392,8 +392,27 @@ class Friends(
         }
     }
     
+    @Subscribe
+    fun onPlayerLoginSendMessage(event: PostLoginEvent) = async {
+        val player = event.player
+        getFriends(player).forEach {
+            server.getPlayer(it).orElse(null)?.sendMessage(config.friendJoinFormat?.templateComponent("player" to player))
+        }
+    }
+    
+    @Subscribe
+    fun onPlayerDisconnectSendMessage(event: DisconnectEvent) = async {
+        if (event.loginStatus != DisconnectEvent.LoginStatus.SUCCESSFUL_LOGIN) return@async
+        val player = event.player
+        getFriends(player).forEach {
+            server.getPlayer(it).orElse(null)?.sendMessage(config.friendQuitFormat?.templateComponent("player" to player))
+        }
+    }
+    
     @Serializable
     data class Config(
+        val friendJoinFormat: String? = "[{\"text\": \"[\", \"color\": \"dark_aqua\"}, {\"text\": \"+\", \"color\": \"green\"}, {\"text\": \"]\", \"color\": \"dark_aqua\"}, {\"text\":\"\${player.username}\", \"color\": \"aqua\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player.username} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" is now online\", \"color\": \"dark_aqua\"}]",
+        val friendQuitFormat: String? = "[{\"text\": \"[\", \"color\": \"dark_aqua\"}, {\"text\": \"-\", \"color\": \"red\"}, {\"text\": \"]\", \"color\": \"dark_aqua\"}, {\"text\":\"\${player.username}\", \"color\": \"aqua\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player.username} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" is now offline\", \"color\": \"dark_aqua\"}]",
         val joinRequests: String? = "[<#list players[0..*5] as player>{\"text\": \"\${player}\", \"color\": \"aqua\", \"clickEvent\": {\"action\": \"suggest_command\", \"value\": \"/msg \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"send message\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[+]\", \"color\": \"green\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends add \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"add\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[-]\", \"color\": \"red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends remove \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"remove\"}}, {\"text\": \" \", \"color\": \"dark_aqua\"}, {\"text\":\"[×]\", \"color\": \"dark_red\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/friends block \${player} \"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"block\"}}<#sep>, {\"text\":\", \", \"color\":\"dark_aqua\"}, </#list>, {\"text\": \" <#if (players?size > 5)>and other \${players?size - 5}</#if> <#if players?size == 1>wants<#else>want</#if> to be your friend.\", \"color\": \"dark_aqua\"}]",
         val mojangServerError: String? = "[{\"text\": \"An error occurred while contacting Mojang servers. \", \"color\": \"dark_gray\"}, {\"text\": \"[RETRY]\", \"color\": \"gray\", \"clickEvent\": {\"action\": \"run_command\", \"value\": \"/\${command}\"}, \"hoverEvent\": {\"action\": \"show_text\", \"value\": \"retry\"}}]",
         val commandName: String = "friends",

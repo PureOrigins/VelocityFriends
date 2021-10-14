@@ -59,7 +59,7 @@ object FriendRequestsTable : Table("friend_request") {
         select { FriendRequestsTable.friendUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.playerUniqueId] }
 }
 
-object NewsTable : LongIdTable("news") {
+object NewsTable : LongIdTable("friend_news") {
     val playerUniqueId = uuid("player_uuid")
     val text = text("text")
     val date = long("date")
