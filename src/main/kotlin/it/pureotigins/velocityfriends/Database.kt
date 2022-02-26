@@ -34,7 +34,7 @@ object FriendsTable : Table("friends") {
     }.mapTo(hashSetOf()) { if (it[this.playerUniqueId] == playerUniqueId) it[this.friendUniqueId] else it[this.playerUniqueId] }
 }
 
-object FriendRequestsTable : Table("friend_request") {
+object FriendRequestsTable : Table("friend_requests") {
     val playerUniqueId = uuid("player_uuid")
     val friendUniqueId = uuid("friend_uuid")
     
@@ -59,7 +59,7 @@ object FriendRequestsTable : Table("friend_request") {
         select { FriendRequestsTable.friendUniqueId eq playerUniqueId }.mapTo(hashSetOf()) { it[this.playerUniqueId] }
 }
 
-object NewsTable : LongIdTable("friend_news") {
+object NewsTable : LongIdTable("friend_notifications") {
     val playerUniqueId = uuid("player_uuid")
     val text = text("text")
     val date = long("date")

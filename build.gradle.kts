@@ -1,12 +1,12 @@
 plugins {
-    kotlin("jvm")
-    kotlin("kapt")
-    kotlin("plugin.serialization")
+    kotlin("jvm") version "1.6.10"
+    kotlin("kapt") version "1.6.10"
+    kotlin("plugin.serialization") version "1.6.10"
     `maven-publish`
 }
 
 group = "it.pureorigins"
-version = "1.0.0"
+version = "1.0.1"
 
 repositories {
     mavenCentral()
@@ -14,17 +14,17 @@ repositories {
     maven(url = "https://jitpack.io")
 }
 
-val fat: Configuration by configurations.creating {
-    isTransitive = true
-    exclude(group = "org.jetbrains.kotlin")
-    exclude(group = "org.jetbrains.kotlinx")
-}
-
 dependencies {
-    compileOnly("com.velocitypowered:velocity-api:3.0.0")
+    compileOnly("com.velocitypowered:velocity-api:3.0.1")
     compileOnly("com.github.PureOrigins:velocity-language-kotlin:1.0.0")
     compileOnly("com.github.PureOrigins:VelocityConfiguration:1.0.1")
-    kapt("com.velocitypowered:velocity-api:3.0.0")
+    kapt("com.velocitypowered:velocity-api:3.0.1")
+}
+
+kotlin {
+    jvmToolchain {
+        (this as JavaToolchainSpec).languageVersion.set(JavaLanguageVersion.of(8))
+    }
 }
 
 publishing {
